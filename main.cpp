@@ -10,6 +10,7 @@
 #define TILE_SIZE 50
 #define TILE_SIZE_ON_ATLAS 50
 #define CAMERA_SPEED 10
+#define PLAYER_RANGE 120 
 
 using namespace std;
 
@@ -140,9 +141,20 @@ Tile* getTileByScreenPos(int x, int y, SDL_Rect &camera) {
 	return &game_map[tileX][tileY];
 }
 
-void renderSellected(SDL_Rect &camera) {	
+bool isCursorInRange(Player &player, int mouseX, int mouseY) {
+		int
+			dx = player.sprite.position.x - mouseX,
+			dy = player.sprite.position.y - mouseY,
+			d = sqrt(dx*dx + dy*dy);
+		
+		return d < PLAYER_RANGE;	
+}
+
+void renderSellected(Player &player, SDL_Rect &camera) {	
 	int mouseX, mouseY;
 	SDL_GetMouseState(&mouseX, &mouseY);
+
+	if (!isCursorInRange(player, mouseX, mouseY)) return;
 
 	Tile* tile = getTileByScreenPos(mouseX, mouseY, camera);
 	if (!tile || tile->sprite.type == VOID || !(tile->sprite.isShown)) return;
@@ -170,10 +182,14 @@ void renderSellected(SDL_Rect &camera) {
     SDL_RenderCopy(ren, texture_atlas, &src, &dst);
 }
 
-void changeToVoid(SDL_Rect &camera) {
+void changeToVoid(SDL_Rect &camera, Player &player) {
 		int mouseX, mouseY;
 		SDL_GetMouseState(&mouseX, &mouseY);
+	
+		if (!isCursorInRange(player, mouseX, mouseY)) return;
+
 		Tile* t = getTileByScreenPos(mouseX, mouseY, camera);
+		
 		if (
 			!(t) || 
 			t->sprite.type == VOID ||
@@ -182,7 +198,7 @@ void changeToVoid(SDL_Rect &camera) {
 		t->sprite.type = VOID;
 }
 
-void renderPlayer(Player &player, SDL_Rect &camera) {
+void renderPlayer(Player &player) {
 	SDL_Rect dst = {
 		player.sprite.position.x,
 		player.sprite.position.y,
@@ -196,11 +212,6 @@ void renderPlayer(Player &player, SDL_Rect &camera) {
 		TILE_SIZE_ON_ATLAS
 	};
 	SDL_RenderCopy(ren, texture_atlas, &src, &dst);
-}
-
-bool canPlayerMove(Player &player, SDL_Rect &camera) {
-	Tile* tile = getTileByScreenPos(player.sprite.x, player.sprite.y, camera);
-	/////
 }
 
 bool Init() {
@@ -289,7 +300,7 @@ int main(void) {
 				isDone = true;
 			}
 			else if (event.type == SDL_MOUSEBUTTONDOWN) {
-				changeToVoid(camera);
+				changeToVoid(camera, player);
 			}
 		}
           
@@ -321,9 +332,9 @@ int main(void) {
 		
 		renderTile(game_map, camera);
 
-		renderSellected(camera);
+		renderSellected(player, camera);
 		
-		renderPlayer(player, camera);
+		renderPlayer(player);
 
 		SDL_RenderPresent(ren);
 		SDL_SetRenderDrawColor(ren, 0, 0, 0, 128);
