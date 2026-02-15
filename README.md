@@ -5,5 +5,5 @@
 For compilation:
 g++ main.cpp $(pkg-config --cflags --libs sdl2 SDL2_image) -o output_name
 
-Dear Mainteiners:
+Dear Maintainers:
 1. Gentoo package maintainer: [Papagemabodi](https://github.com/Papagemabodi/overlay-of-FreshCrz.git)
