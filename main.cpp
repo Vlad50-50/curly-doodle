@@ -10,7 +10,7 @@
 #define TILE_SIZE 50
 #define TILE_SIZE_ON_ATLAS 50
 #define CAMERA_SPEED 10
-#define PLAYER_RANGE 120 
+#define PLAYER_RANGE 60 
 
 using namespace std;
 
@@ -143,8 +143,8 @@ Tile* getTileByScreenPos(int x, int y, SDL_Rect &camera) {
 
 bool isCursorInRange(Player &player, int mouseX, int mouseY) {
 		int
-			dx = player.sprite.position.x - mouseX,
-			dy = player.sprite.position.y - mouseY,
+			dx = (player.sprite.position.x + player.sprite.position.w / 2) - mouseX,
+			dy = (player.sprite.position.y + player.sprite.position.h / 2) - mouseY,
 			d = sqrt(dx*dx + dy*dy);
 		
 		return d < PLAYER_RANGE;	
@@ -202,8 +202,8 @@ void renderPlayer(Player &player) {
 	SDL_Rect dst = {
 		player.sprite.position.x,
 		player.sprite.position.y,
-		TILE_SIZE / 2,
-		TILE_SIZE / 2
+		player.sprite.position.w,
+		player.sprite.position.h
 	};
 	SDL_Rect src = {
 		TILE_SIZE_ON_ATLAS * player.sprite.type,	
@@ -212,6 +212,27 @@ void renderPlayer(Player &player) {
 		TILE_SIZE_ON_ATLAS
 	};
 	SDL_RenderCopy(ren, texture_atlas, &src, &dst);
+}
+
+void cameraMovement(Player &player, SDL_Rect &camera, short int x, short int y) {
+	int tileX = (player.sprite.position.x + x);
+	int tileY = (player.sprite.position.y + y);
+
+	if (x > 0) {
+		tileX = (player.sprite.position.x + x + player.sprite.position.w);
+	}
+	if (y > 0) {
+		tileY = (player.sprite.position.y + y + player.sprite.position.h);
+	}
+ 
+	Tile *t = getTileByScreenPos(tileX, tileY, camera);
+
+    if (!t) return;
+    if (t->sprite.type != VOID)
+        return;
+
+    camera.x += x;
+    camera.y += y;
 }
 
 bool Init() {
@@ -225,7 +246,7 @@ bool Init() {
 	}
 	
 	win = SDL_CreateWindow(
-		"Miners",
+		"Happy Miner",
 		SDL_WINDOWPOS_UNDEFINED,
 		SDL_WINDOWPOS_UNDEFINED,
 		SCREEN_SIZE[0],
@@ -287,6 +308,9 @@ int main(void) {
 	player.sprite.position.x = SCREEN_SIZE[0] / 2 + 10;
 	player.sprite.position.y = SCREEN_SIZE[1] / 2 + 10;
 
+	player.sprite.position.h = TILE_SIZE / 2;
+	player.sprite.position.w = TILE_SIZE / 2;
+	
 	short unsigned int 
 		map_w = GAME_MAP_SIZE * TILE_SIZE,
 		map_h = GAME_MAP_SIZE * TILE_SIZE;
@@ -307,16 +331,20 @@ int main(void) {
 		const Uint8* keys = SDL_GetKeyboardState(NULL);	
 
 		if (keys[SDL_SCANCODE_W]) {
-			camera.y -= CAMERA_SPEED;
+			cameraMovement(player, camera, 0, -CAMERA_SPEED);
+			//camera.y -= CAMERA_SPEED;
 		} 
 		if (keys[SDL_SCANCODE_S]) {
-			camera.y += CAMERA_SPEED;
+			cameraMovement(player, camera, 0, CAMERA_SPEED);
+			//camera.y += CAMERA_SPEED;
 		}
 		if (keys[SDL_SCANCODE_A]) {
-			camera.x -= CAMERA_SPEED;
+			cameraMovement(player, camera, -CAMERA_SPEED, 0);
+			//camera.x -= CAMERA_SPEED;
 		}
 		if (keys[SDL_SCANCODE_D]) {
-			camera.x += CAMERA_SPEED;
+			cameraMovement(player, camera, CAMERA_SPEED, 0);			
+			//camera.x += CAMERA_SPEED;
 		}
 
 		if (camera.x < 0) camera.x = 0;
