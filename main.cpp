@@ -1,9 +1,11 @@
 #include <SDL2/SDL.h>
 #include <SDL_image.h>
+#include <SDL_ttf.h>
 #include <iostream>
 #include <cmath>
 #include <ctime>
 #include <vector>
+#include <string>
 
 #define GAME_MAP_SIZE 512
 #define TEXTURE_ATLAS_PATH "assets/texture-atlas.png"
@@ -11,6 +13,7 @@
 #define TILE_SIZE_ON_ATLAS 50
 #define CAMERA_SPEED 10
 #define PLAYER_RANGE 60 
+#define GAME_FONT_PATH "assets/fonts/Roboto/static/Roboto-Light.ttf"
 
 using namespace std;
 
@@ -45,7 +48,7 @@ struct Item {
 
 struct Player {
 	Sprite sprite;	
-	vector<Item> items;	
+	short int *items;
 };
 
 const short unsigned int
@@ -55,6 +58,8 @@ SDL_Window *win = NULL;
 SDL_Renderer *ren = NULL;
 
 SDL_Texture *texture_atlas = NULL;
+
+TTF_Font *gameFont = NULL;
 
 Tile game_map[GAME_MAP_SIZE][GAME_MAP_SIZE];
 
@@ -195,6 +200,9 @@ void changeToVoid(SDL_Rect &camera, Player &player) {
 			t->sprite.type == VOID ||
 			!(t->sprite.isShown)
 		) return;
+	
+		player.items[t->sprite.type]++;
+		
 		t->sprite.type = VOID;
 }
 
@@ -235,6 +243,42 @@ void cameraMovement(Player &player, SDL_Rect &camera, short int x, short int y) 
     camera.y += y;
 }
 
+void renderText(const char* msg, SDL_Rect dst, SDL_Color color) {
+
+	SDL_Surface *temp_surf = TTF_RenderUTF8_Blended(
+													gameFont, 
+													msg,
+													color
+	);
+	SDL_Texture *temp_texture = SDL_CreateTextureFromSurface(ren, temp_surf);
+	
+	SDL_QueryTexture(temp_texture, NULL, NULL, &dst.w, &dst.h);
+	SDL_RenderCopy(ren, temp_texture, NULL, &dst);
+	
+	SDL_FreeSurface(temp_surf);	
+	SDL_DestroyTexture(temp_texture);
+}
+
+void renderMenu(Player &player) {
+	string strs[5] = {
+		"Coal: ",
+		"Copper: ",
+		"Iron: ",
+		"Gold: ",
+		"Stone: "
+	};
+
+	for (short int i = 1; i <= 5; ++i) {
+		string msg = strs[i-1] + to_string(player.items[i-1]);
+
+		renderText(
+			msg.c_str(),
+			{50, 50*i, 200, 200},
+			{255, 255, 255, 255}
+		);
+	}	
+}
+
 bool Init() {
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
 		cout << SDL_GetError() << endl;
@@ -242,6 +286,10 @@ bool Init() {
 	}
 	if (!(IMG_Init(IMG_INIT_PNG) & IMG_INIT_PNG)) {
 		cout << IMG_GetError() << endl;
+		return false;
+	}
+	if (TTF_Init() != 0) {
+		cout << TTF_GetError() << endl;
 		return false;
 	}
 	
@@ -285,6 +333,7 @@ void Load() {
 			game_map[i][j].sprite.position = {TILE_SIZE*i, TILE_SIZE*j, TILE_SIZE, TILE_SIZE};
 		}
 	}
+	gameFont = TTF_OpenFont(GAME_FONT_PATH, 15);
 }
 
 int main(void) {
@@ -310,6 +359,9 @@ int main(void) {
 
 	player.sprite.position.h = TILE_SIZE / 2;
 	player.sprite.position.w = TILE_SIZE / 2;
+
+	player.items = new short int[5];
+	for (int i = 0; i < 5; ++i) player.items[i] = 0;
 	
 	short unsigned int 
 		map_w = GAME_MAP_SIZE * TILE_SIZE,
@@ -363,7 +415,9 @@ int main(void) {
 		renderSellected(player, camera);
 		
 		renderPlayer(player);
-
+	
+		renderMenu(player);	
+	
 		SDL_RenderPresent(ren);
 		SDL_SetRenderDrawColor(ren, 0, 0, 0, 128);
 		SDL_Delay(30);
@@ -374,5 +428,7 @@ int main(void) {
 
 	SDL_Quit();
 	IMG_Quit();
+	
+	delete[] player.items;
 	return 0;
 }
