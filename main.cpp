@@ -6,6 +6,7 @@
 #include <ctime>
 #include <vector>
 #include <string>
+#include <sqlite3.h>
 
 #define GAME_MAP_SIZE 512
 #define TEXTURE_ATLAS_PATH "assets/texture-atlas.png"
@@ -14,6 +15,7 @@
 #define CAMERA_SPEED 10
 #define PLAYER_RANGE 60 
 #define GAME_FONT_PATH "assets/fonts/Roboto/static/Roboto-Light.ttf"
+#define DATA_BASE "save"
 
 using namespace std;
 
@@ -39,6 +41,15 @@ struct Sprite {
 struct Tile {
 	Sprite sprite;
 	short unsigned int value;
+};
+
+struct SaveTile {
+	uint16_t type;
+	uint16_t x;
+	uint16_t y;
+	uint16_t isShown;
+	uint16_t hp;
+	uint16_t value;
 };
 
 struct Item {
@@ -83,10 +94,10 @@ Tile getRandomTile() {
 		return templates[2];
 	}
 	else if (index >= 100) {
-		return templates[1];
+		return templates[0];
 	}
 	else if (index >= 80) {
-		return templates[0];
+		return templates[1];
 	}
 	else {
 		return templates[4];
@@ -279,6 +290,69 @@ void renderMenu(Player &player) {
 	}	
 }
 
+SaveTile toSaveTile(const Tile &t) {
+	
+	 SaveTile saveTile = {
+		static_cast<uint16_t>(t.sprite.type),
+		static_cast<uint16_t>(t.sprite.position.x),
+		static_cast<uint16_t>(t.sprite.position.y),
+		static_cast<uint16_t>(t.sprite.isShown), 
+		static_cast<uint16_t>(t.sprite.hp),
+		static_cast<uint16_t>(t.value),
+	};
+	return saveTile;
+}
+
+void loadToDB(std::vector<SaveTile> &buffer) {
+	sqlite3* db;
+	sqlite3_open(DATA_BASE, &db);
+	
+	sqlite3_exec(
+		db, 
+		"CREATE TABLE IF NOT EXISTS maps ("
+		"id INTEGER PRIMARY KEY,"
+		"width INTEGER,"
+		"height INTEGER,"
+		"tiles BLOB"
+		")",
+		nullptr, nullptr, nullptr
+	);
+	
+	sqlite3_stmt *stmt;
+
+	sqlite3_prepare_v2(
+		db,
+		"INSERT INTO maps (width, height, tiles) VALUES (?, ?, ?)",
+		-1, &stmt, nullptr
+	);
+	
+	sqlite3_bind_int(stmt, 1, 512);
+	sqlite3_bind_int(stmt, 2, 512);
+	sqlite3_bind_blob(
+		stmt, 3,
+		buffer.data(),
+		buffer.size() * sizeof(SaveTile),
+		SQLITE_TRANSIENT
+	);
+	
+	sqlite3_step(stmt);
+	sqlite3_finalize(stmt);
+
+	sqlite3_close(db);
+}
+
+void pacMap(){
+	std::vector<SaveTile> buffer;
+	buffer.reserve(GAME_MAP_SIZE * GAME_MAP_SIZE);
+	
+	for (int x = 0; x < GAME_MAP_SIZE; ++x) {
+		for (int y = 0; y < GAME_MAP_SIZE; ++y) {
+			buffer.push_back(toSaveTile(game_map[x][y]));
+		}
+	}
+	loadToDB(buffer);	
+}
+
 bool Init() {
 	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
 		cout << SDL_GetError() << endl;
@@ -422,7 +496,9 @@ int main(void) {
 		SDL_SetRenderDrawColor(ren, 0, 0, 0, 128);
 		SDL_Delay(30);
 	}
-
+	
+	pacMap();
+	
 	SDL_DestroyTexture(texture_atlas);
 	SDL_DestroyRenderer(ren);
 
